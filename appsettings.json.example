@@ -1,0 +1,669 @@
+{
+  "runtime": {
+    "appName": "cfi-edi-processor",
+    "environment": "development",
+    "logsDirectory": "logs",
+    "workingDirectory": "work",
+    "liveProviderAllowList": [
+      "Kirk_Pharmacy"
+    ],
+    "failOnFileStatuses": [
+      "prefix_failed",
+      "preprocessing_failed",
+      "duplicate_skipped",
+      "duplicate_check_failed",
+      "validation_failed",
+      "converter_not_configured",
+      "conversion_failed",
+      "converter_output_verification_failed",
+      "publish_failed",
+      "inbox_observation_not_found",
+      "inbox_observation_zero_byte"
+    ]
+  },
+  "paths": {
+    "sourceRoot": "C:\\EDI\\SFTPRoot",
+    "qdsProcessorRoot": "C:\\EDI\\QDS_Processor",
+    "x12FilesDirectory": "C:\\EDI\\QDS_Processor\\X12 FILES",
+    "converted837IDirectory": "C:\\EDI\\QDS_Processor\\X12 837I CONVERTED TO 837P",
+    "incomingDirectory": "C:\\Files\\INCOMING",
+    "inboxDirectory": "C:\\Files\\INBOX",
+    "converterLogsDirectory": "logs\\converters",
+    "validationReportsDirectory": "logs\\validation",
+    "templatesDirectory": "templates",
+    "renderedNotificationsDirectory": "logs\\notifications"
+  },
+  "converters": {
+    "rxFlatfileTo837P": "C:\\Path\\To\\RXFLATFILE_TO_837P_47.exe",
+    "convert837ITo837P": "C:\\Path\\To\\CONVERT_837I_TO_837P.exe",
+    "timeoutSeconds": 300
+  },
+  "publish": {
+    "stabilityChecks": 3,
+    "stabilityIntervalSeconds": 2,
+    "maxRetries": 5,
+    "retryDelaySeconds": 5,
+    "tempSuffix": ".copying",
+    "observeInbox": false,
+    "inboxObservationTimeoutSeconds": 60,
+    "inboxObservationIntervalSeconds": 5
+  },
+  "duplicateCheck": {
+    "enabled": false,
+    "driver": "ODBC Driver 17 for SQL Server",
+    "server": "sql.example.local",
+    "database": "TPM_DATABASE_NAME",
+    "trustedConnection": true,
+    "usernameEnv": "TPM_DB_USERNAME",
+    "passwordEnv": "TPM_DB_PASSWORD",
+    "table": "batch",
+    "fileNameColumn": "file_name",
+    "matchMode": "contains",
+    "failOnUnavailable": true
+  },
+  "email": {
+    "enabled": false,
+    "sendProviderValidationEmails": false,
+    "smtpServer": "smtp.example.local",
+    "smtpPort": 587,
+    "useSsl": true,
+    "fromAddress": "no-reply@example.com",
+    "defaultRecipients": [
+      "edi-notifications@example.com"
+    ],
+    "usernameEnv": "SMTP_USERNAME",
+    "passwordEnv": "SMTP_PASSWORD"
+  },
+  "transactionReports": {
+    "enabled": true,
+    "sendEmail": false,
+    "recipients": [
+      "sftp-inbox@example.com"
+    ],
+    "subjectPrefix": "EDI transaction count report"
+  },
+  "validationSchemas": [
+    {
+      "key": "kirk_pharmacy_txt",
+      "fileType": "csv",
+      "delimiter": ",",
+      "headerRow": 1,
+      "dataStartRow": 2,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": true,
+      "fields": [
+        {"name": "TX-Date Filled", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y"]},
+        {"name": "PD-Pat Combined Name", "required": true, "type": "string"},
+        {"name": "TX-Quantity Disp", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Price", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Copay", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Primary Amt Due", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Price Code", "required": false, "type": "string"},
+        {"name": "RX-Drug Name", "required": true, "type": "string"},
+        {"name": "DR-Doctor Name(25)", "required": false, "type": "string"},
+        {"name": "PD-Patient Birthdate", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y"]},
+        {"name": "PI-Ins Group#", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-)$"},
+        {"name": "TX-Rx Number", "required": true, "type": "string"},
+        {"name": "TX-Remaining Refills", "required": false, "type": "integer", "min": "0"}
+      ]
+    },
+    {
+      "key": "care_pharmacy_txt",
+      "fileType": "csv",
+      "delimiter": ",",
+      "headerRow": 1,
+      "dataStartRow": 2,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": true,
+      "fields": [
+        {"name": "TX-Date Filled", "required": true, "type": "date", "dateFormats": ["%B %d, %Y"]},
+        {"name": "PD-Pat Combined Name", "required": true, "type": "string"},
+        {"name": "PI-Ins Policy#", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-).*$"},
+        {"name": "DG-Drug Name 27", "required": true, "type": "string"},
+        {"name": "TX-Quantity Disp", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Price", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Copay", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Primary Amt Due", "required": true, "type": "decimal", "min": "0"},
+        {"name": "TX-Rx Number", "required": true, "type": "string"},
+        {"name": "DR-Doctor Name(25)", "required": false, "type": "string"},
+        {"name": "PD-Patient Birthdate", "required": true, "type": "date", "dateFormats": ["%B %d, %Y"]},
+        {"name": "PC-Description", "required": false, "type": "string"}
+      ]
+    },
+    {
+      "key": "valu_med_pharmacy_csv",
+      "fileType": "csv",
+      "delimiter": ",",
+      "headerRow": 1,
+      "dataStartRow": 3,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": true,
+      "fields": [
+        {"name": "Last Name", "required": true, "type": "string"},
+        {"name": "First Name", "required": true, "type": "string"},
+        {"name": "DOB", "required": true, "type": "date", "dateFormats": ["%-d-%b-%y", "%d-%b-%y", "%-d-Sept-%y", "%d-Sept-%y"]},
+        {"name": "Group No", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-)$"},
+        {"name": "Cert No", "required": false, "type": "string"},
+        {"name": "Doctor", "required": false, "type": "string"},
+        {"name": "Date", "required": true, "type": "date", "dateFormats": ["%-d-%b-%y", "%d-%b-%y", "%-d-Sept-%y", "%d-Sept-%y"]},
+        {"name": "Pres #", "required": true, "type": "string"},
+        {"name": "New/Old", "required": false, "type": "string"},
+        {"name": "Qty", "required": true, "type": "decimal", "min": "0"},
+        {"name": "Medication", "required": true, "type": "string"},
+        {"name": "Price-CI", "required": true, "type": "decimal", "min": "0"},
+        {"name": "CoPay-CI", "required": true, "type": "decimal", "min": "0"},
+        {"name": "Claim-CI", "required": true, "type": "decimal", "min": "0"},
+        {"name": "Price-US", "required": false, "type": "decimal", "min": "0"},
+        {"name": "CoPay-US", "required": false, "type": "decimal", "min": "0"},
+        {"name": "Claim-US", "required": false, "type": "decimal", "min": "0"}
+      ]
+    },
+    {
+      "key": "health_care_pharmacy_csv",
+      "fileType": "csv",
+      "delimiter": ",",
+      "headerRow": 1,
+      "dataStartRow": 2,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": true,
+      "fields": [
+        {"name": "PatientName", "required": true, "type": "string"},
+        {"name": "Sex", "required": false, "type": "string"},
+        {"name": "BirthDate", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "%m/%d/%y", "%-m/%-d/%y"]},
+        {"name": "RC", "required": false, "type": "string"},
+        {"name": "DrugName", "required": true, "type": "string"},
+        {"name": "RXNumber", "required": true, "type": "string"},
+        {"name": "RXDate", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "%m/%d/%y", "%-m/%-d/%y"]},
+        {"name": "Quantity", "required": true, "type": "decimal", "min": "0"},
+        {"name": "DS", "required": false, "type": "string"},
+        {"name": "Doctor", "required": false, "type": "string"},
+        {"name": "DoctorNumber", "required": false, "type": "string"},
+        {"name": "DType", "required": false, "type": "string"},
+        {"name": "PolicyNumber", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-)$"},
+        {"name": "NDCNumber", "required": false, "type": "string"},
+        {"name": "Type", "required": false, "type": "string"},
+        {"name": "STCode", "required": false, "type": "string"},
+        {"name": "InCareOf", "required": false, "type": "string"},
+        {"name": "Manufacturer", "required": false, "type": "string"},
+        {"name": "PriorAuth", "required": false, "type": "string"},
+        {"name": "Tax", "required": false, "type": "decimal", "min": "0"},
+        {"name": "Total", "required": true, "type": "decimal", "min": "0"},
+        {"name": "CoPay", "required": true, "type": "decimal", "min": "0"},
+        {"name": "Balance", "required": true, "type": "decimal", "min": "0"}
+      ]
+    },
+    {
+      "key": "windward_csv",
+      "fileType": "csv",
+      "delimiter": ",",
+      "headerRow": 1,
+      "dataStartRow": 2,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": true,
+      "fields": [
+        {"name": "PatientName", "required": true, "type": "string"},
+        {"name": "Sex", "required": false, "type": "string"},
+        {"name": "BirthDate", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "%m/%d/%y", "%-m/%-d/%y"]},
+        {"name": "RC", "required": false, "type": "string"},
+        {"name": "DrugName", "required": true, "type": "string"},
+        {"name": "RXNumber", "required": true, "type": "string"},
+        {"name": "RXDate", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "%m/%d/%y", "%-m/%-d/%y"]},
+        {"name": "Quantity", "required": true, "type": "decimal", "min": "0"},
+        {"name": "DS", "required": false, "type": "string"},
+        {"name": "Doctor", "required": false, "type": "string"},
+        {"name": "DoctorNumber", "required": false, "type": "string"},
+        {"name": "DType", "required": false, "type": "string"},
+        {"name": "PolicyNumber", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-)$"},
+        {"name": "NDCNumber", "required": false, "type": "string"},
+        {"name": "Type", "required": false, "type": "string"},
+        {"name": "STCode", "required": false, "type": "string"},
+        {"name": "InCareOf", "required": false, "type": "string"},
+        {"name": "Manufacturer", "required": false, "type": "string"},
+        {"name": "PriorAuth", "required": false, "type": "string"},
+        {"name": "Tax", "required": false, "type": "decimal", "min": "0"},
+        {"name": "Total", "required": true, "type": "decimal", "min": "0"},
+        {"name": "CoPay", "required": true, "type": "decimal", "min": "0"},
+        {"name": "Balance", "required": true, "type": "decimal", "min": "0"}
+      ]
+    },
+    {
+      "key": "doctors_express_xlsx",
+      "fileType": "xlsx",
+      "headerRow": 9,
+      "dataStartRow": 10,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": false,
+      "fields": [
+        {"name": "LOCATION NAME OR NUMBER", "required": true, "type": "string"},
+        {"name": "MEMBER ID", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-)$"},
+        {"name": "MEMBER NAME", "required": true, "type": "string"},
+        {"name": "DATE OF BIRTH (MM/DD/YYYY)", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "excel_serial"]},
+        {"name": "PRESCRIPTION NO", "required": true, "type": "string"},
+        {"name": "DRUG NAME", "required": true, "type": "string"},
+        {"name": "NDC NO", "required": false, "type": "string"},
+        {"name": "BRAND OR GENERIC", "required": false, "type": "string"},
+        {"name": "QUANTITY", "required": true, "type": "decimal", "min": "0"},
+        {"name": "DAYS SUPPLIED", "required": false, "type": "integer", "min": "0"},
+        {"name": "PRESCIRBING PHYSICIAN'S NAME", "required": false, "type": "string"},
+        {"name": "TOTAL BILLED", "required": true, "type": "decimal", "min": "0"},
+        {"name": "CO-PAY", "required": true, "type": "decimal", "min": "0"},
+        {"name": "BALANCE DUE", "required": true, "type": "decimal", "min": "0"},
+        {"name": "DATE OF SERVICE (MM/DD/YYYY)", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "excel_serial"]}
+      ]
+    },
+    {
+      "key": "fosters_pharmacy_xlsx",
+      "fileType": "xlsx",
+      "headerRow": 9,
+      "dataStartRow": 10,
+      "allowBlankRows": true,
+      "strictColumnCount": true,
+      "malformedQuoteCheck": false,
+      "fields": [
+        {"name": "LOCATION NAME OR NUMBER", "required": true, "type": "string"},
+        {"name": "MEMBER ID", "required": true, "type": "member_id", "pattern": "^(\\d{5}-\\d{5}-\\d{2}|\\d{4}-\\d{4}-\\d{2}|-\\s{4}-)$"},
+        {"name": "MEMBER NAME", "required": true, "type": "string"},
+        {"name": "DATE OF BIRTH (MM/DD/YYYY)", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "excel_serial"]},
+        {"name": "PRESCRIPTION NO", "required": true, "type": "string"},
+        {"name": "DRUG NAME", "required": true, "type": "string"},
+        {"name": "NDC NO", "required": false, "type": "string"},
+        {"name": "BRAND OR GENERIC", "required": false, "type": "string"},
+        {"name": "QUANTITY", "required": true, "type": "decimal", "min": "0"},
+        {"name": "DAYS SUPPLIED", "required": false, "type": "integer", "min": "0"},
+        {"name": "PRESCIRBING PHYSICIAN'S NAME", "required": false, "type": "string"},
+        {"name": "TOTAL BILLED", "required": true, "type": "decimal", "min": "0"},
+        {"name": "CO-PAY", "required": true, "type": "decimal", "min": "0"},
+        {"name": "BALANCE DUE", "required": true, "type": "decimal", "min": "0"},
+        {"name": "DATE OF SERVICE (MM/DD/YYYY)", "required": true, "type": "date", "dateFormats": ["%m/%d/%Y", "%-m/%-d/%Y", "excel_serial"]}
+      ]
+    }
+  ],
+  "providers": [
+    {
+      "key": "Care_Pharmacy",
+      "name": "Care Pharmacy",
+      "folder": "Care_Pharmacy",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "F00093_"
+        ],
+        "addIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".txt"
+        ],
+        "delimiter": ","
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "care_pharmacy_txt"
+      },
+      "converter": "rxFlatfileTo837P"
+    },
+    {
+      "key": "Doctors Express",
+      "name": "Doctors Express",
+      "folder": "Doctors Express",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "PHARM0176_"
+        ],
+        "addIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".xlsx"
+        ],
+        "headerRow": 9,
+        "dataStartRow": 10
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "doctors_express_xlsx"
+      },
+      "converter": "rxFlatfileTo837P",
+      "notes": [
+        "Submission date is in B7 but is not operationally important."
+      ]
+    },
+    {
+      "key": "Doctors_Hospital",
+      "name": "Doctors Hospital",
+      "folder": "Doctors_Hospital",
+      "aliases": [],
+      "autoProcess": false,
+      "archive": {
+        "enabled": false,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": []
+      },
+      "fileFormat": {
+        "extensions": [
+          ".837i",
+          ".837p",
+          ".txt"
+        ]
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": false
+      },
+      "converter": null,
+      "notes": [
+        "Testing only for now. Do not archive or auto-process until configured.",
+        "Future 837I files route to convert837ITo837P; future 837P files publish directly to INCOMING."
+      ]
+    },
+    {
+      "key": "Fosters_Pharmacy",
+      "name": "Fosters Pharmacy",
+      "folder": "Fosters_Pharmacy",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "A0000049_",
+          "S0000048_"
+        ],
+        "addIfMissing": false,
+        "rejectIfMissing": true,
+        "deriveFrom": "column:A,row:10,locations:Airport Pharmacy=A0000049_;Camana Bay Pharmacy=S0000048_",
+        "rejectIfMultipleLocations": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".xlsx"
+        ],
+        "headerRow": 9,
+        "dataStartRow": 10
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "fosters_pharmacy_xlsx"
+      },
+      "converter": "rxFlatfileTo837P"
+    },
+    {
+      "key": "Health_Care_Pharmacy",
+      "name": "Health Care Pharmacy",
+      "folder": "Health_Care_Pharmacy",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com",
+        "subLocations": {
+          "F00165": {
+            "email": "edi-notifications@example.com"
+          },
+          "H0000050": {
+            "email": "edi-notifications@example.com"
+          }
+        }
+      },
+      "prefix": {
+        "values": [
+          "H0000050_",
+          "F00165_"
+        ],
+        "addIfMissing": false,
+        "rejectIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".txt"
+        ],
+        "delimiter": "\t"
+      },
+      "preprocessing": {
+        "enabled": true,
+        "kind": "fixedReportToCsv",
+        "outputFormat": "csv"
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "health_care_pharmacy_csv"
+      },
+      "converter": "rxFlatfileTo837P"
+    },
+    {
+      "key": "Health_City",
+      "name": "Health City",
+      "folder": "Health_City",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "F00140_"
+        ],
+        "addIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".837i",
+          ".txt"
+        ]
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": false
+      },
+      "converter": "convert837ITo837P"
+    },
+    {
+      "key": "HSA",
+      "name": "HSA",
+      "folder": "HSA",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "H0000006_"
+        ],
+        "addIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".837i"
+        ]
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": false
+      },
+      "converter": "convert837ITo837P"
+    },
+    {
+      "key": "Kirk_Pharmacy",
+      "name": "Kirk Pharmacy",
+      "folder": "Kirk_Pharmacy",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "K0000054_"
+        ],
+        "addIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".txt"
+        ],
+        "delimiter": ","
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "kirk_pharmacy_txt"
+      },
+      "converter": "rxFlatfileTo837P"
+    },
+    {
+      "key": "Valu_Med_Pharmacy",
+      "name": "Valu-Med Pharmacy",
+      "folder": "Valu_Med_Pharmacy",
+      "aliases": [],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "H0000046_",
+          "F00171_"
+        ],
+        "addIfMissing": false,
+        "rejectIfMissing": true,
+        "deriveFrom": "sheetName"
+      },
+      "fileFormat": {
+        "extensions": [
+          ".csv",
+          ".xlsx"
+        ],
+        "headerRow": 1,
+        "dataStartRow": 3,
+        "delimiter": ","
+      },
+      "preprocessing": {
+        "enabled": false
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "valu_med_pharmacy_csv"
+      },
+      "converter": "rxFlatfileTo837P"
+    },
+    {
+      "key": "WindWard",
+      "name": "Windward Pharmacy",
+      "folder": "WindWard",
+      "aliases": [
+        "Windward",
+        "WinWard"
+      ],
+      "autoProcess": true,
+      "archive": {
+        "enabled": true,
+        "folderName": "backup",
+        "dateFormat": "%m-%d-%Y"
+      },
+      "notification": {
+        "email": "edi-notifications@example.com"
+      },
+      "prefix": {
+        "values": [
+          "W0000059_"
+        ],
+        "addIfMissing": true
+      },
+      "fileFormat": {
+        "extensions": [
+          ".txt"
+        ],
+        "delimiter": "\t"
+      },
+      "preprocessing": {
+        "enabled": true,
+        "kind": "fixedReportToCsv",
+        "outputFormat": "csv"
+      },
+      "validation": {
+        "enabled": true,
+        "schema": "windward_csv"
+      },
+      "converter": "rxFlatfileTo837P"
+    }
+  ]
+}

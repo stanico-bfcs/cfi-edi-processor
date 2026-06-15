@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Validation Failed</title>
+</head>
+<body>
+  <p>Provider: {{ provider_name }}</p>
+  <p>File: {{ file_name }}</p>
+  <p>Received/Run ID: {{ run_id }}</p>
+  <p>Issue count: {{ issues|length }}</p>
+
+  <table border="1" cellspacing="0" cellpadding="4">
+    <thead>
+      <tr>
+        <th>Severity</th>
+        <th>Code</th>
+        <th>Row</th>
+        <th>Field</th>
+        <th>Message</th>
+        <th>Raw Value</th>
+        <th>Suggested Fix</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for issue in issues %}
+      <tr>
+        <td>{{ issue.severity }}</td>
+        <td>{{ issue.error_code }}</td>
+        <td>{{ issue.row_number or "" }}</td>
+        <td>{{ issue.field_name or "" }}</td>
+        <td>{{ issue.message }}</td>
+        <td>{{ issue.raw_value or "" }}</td>
+        <td>{{ issue.suggested_fix or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p>Please correct the listed issues and resubmit the file.</p>
+</body>
+</html>

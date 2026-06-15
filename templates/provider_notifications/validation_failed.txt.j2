@@ -1,0 +1,17 @@
+Provider: {{ provider_name }}
+File: {{ file_name }}
+Received/Run ID: {{ run_id }}
+Issue count: {{ issues|length }}
+
+Validation issues:
+{% for issue in issues %}
+- Severity: {{ issue.severity }}
+  Code: {{ issue.error_code }}
+  Row: {{ issue.row_number or "" }}
+  Field: {{ issue.field_name or "" }}
+  Message: {{ issue.message }}
+  Raw Value: {{ issue.raw_value or "" }}
+  Suggested Fix: {{ issue.suggested_fix or "" }}
+{% endfor %}
+
+Please correct the listed issues and resubmit the file.

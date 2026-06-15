@@ -1,0 +1,24 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local configuration and runtime output
+.env
+appsettings.json
+logs/
+work/
+
+# Legacy powershell scripts that moved the files from the FTP server to the new location. 
+# These scripts are no longer needed. Ignoring as they have plain text credentials in them.
+legacy_ps/
+
+AGENTS.md
+
+temp/
