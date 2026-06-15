@@ -39,6 +39,25 @@ class TransactionReportSettings:
 
 
 @dataclass(frozen=True)
+class ReceivedDateOverrideSettings:
+    enabled: bool = True
+    admin_folder_name: str = "CFI-Admin"
+    file_name: str = "received_dates.csv"
+    date_format: str = "%Y-%m-%d"
+    cleanup: str = "delete"
+
+
+@dataclass(frozen=True)
+class X12ValidationSettings:
+    enabled: bool = True
+    date_of_service_enabled: bool = True
+    service_date_segment: str = "DTP"
+    service_date_qualifier: str = "472"
+    range_format_qualifier: str = "RD8"
+    require_service_date: bool = True
+
+
+@dataclass(frozen=True)
 class PathSettings:
     source_root: Path = Path(".")
     qds_processor_root: Path = Path(".")
@@ -179,6 +198,10 @@ class AppSettings:
     transaction_reports: TransactionReportSettings = field(
         default_factory=TransactionReportSettings
     )
+    received_date_overrides: ReceivedDateOverrideSettings = field(
+        default_factory=ReceivedDateOverrideSettings
+    )
+    x12_validation: X12ValidationSettings = field(default_factory=X12ValidationSettings)
     paths: PathSettings = field(default_factory=PathSettings)
     converters: ConverterSettings = field(default_factory=ConverterSettings)
     publish: PublishSettings = field(default_factory=PublishSettings)
@@ -212,6 +235,8 @@ def load_settings(config_path: Path) -> AppSettings:
     runtime_data = data.get("runtime", {})
     email_data = data.get("email", {})
     transaction_reports_data = data.get("transactionReports", {})
+    received_date_overrides_data = data.get("receivedDateOverrides", {})
+    x12_validation_data = data.get("x12Validation", {})
     paths_data = data.get("paths", {})
     converters_data = data.get("converters", {})
     publish_data = data.get("publish", {})
@@ -254,6 +279,27 @@ def load_settings(config_path: Path) -> AppSettings:
                 "EDI transaction count report",
             )
         ),
+    )
+
+    received_date_overrides = ReceivedDateOverrideSettings(
+        enabled=bool(received_date_overrides_data.get("enabled", True)),
+        admin_folder_name=str(
+            received_date_overrides_data.get("adminFolderName", "CFI-Admin")
+        ),
+        file_name=str(received_date_overrides_data.get("fileName", "received_dates.csv")),
+        date_format=str(received_date_overrides_data.get("dateFormat", "%Y-%m-%d")),
+        cleanup=str(received_date_overrides_data.get("cleanup", "delete")),
+    )
+
+    x12_validation = X12ValidationSettings(
+        enabled=bool(x12_validation_data.get("enabled", True)),
+        date_of_service_enabled=bool(
+            x12_validation_data.get("dateOfServiceEnabled", True)
+        ),
+        service_date_segment=str(x12_validation_data.get("serviceDateSegment", "DTP")),
+        service_date_qualifier=str(x12_validation_data.get("serviceDateQualifier", "472")),
+        range_format_qualifier=str(x12_validation_data.get("rangeFormatQualifier", "RD8")),
+        require_service_date=bool(x12_validation_data.get("requireServiceDate", True)),
     )
 
     paths = PathSettings(
@@ -332,6 +378,8 @@ def load_settings(config_path: Path) -> AppSettings:
         runtime=runtime,
         email=email,
         transaction_reports=transaction_reports,
+        received_date_overrides=received_date_overrides,
+        x12_validation=x12_validation,
         paths=paths,
         converters=converters,
         publish=publish,
@@ -458,6 +506,9 @@ def _validate_settings(settings: AppSettings) -> None:
 
         if duplicate_check.match_mode not in {"contains", "exact"}:
             raise ValueError("duplicateCheck.matchMode must be either 'contains' or 'exact'.")
+
+    if settings.received_date_overrides.cleanup not in {"delete", "keep"}:
+        raise ValueError("receivedDateOverrides.cleanup must be either 'delete' or 'keep'.")
 
 
 def _resolve_path(base_dir: Path, value: Any) -> Path:

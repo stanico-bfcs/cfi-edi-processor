@@ -74,7 +74,11 @@ class PreprocessingService:
             writer.writeheader()
             writer.writerows(rows)
 
-        processed_submission = FileSubmission(provider=submission.provider, path=output_path)
+        processed_submission = FileSubmission(
+            provider=submission.provider,
+            path=output_path,
+            received_date=submission.received_date,
+        )
         self.logger.info(
             f"Preprocessed fixed report to CSV: {output_path}",
             extra={

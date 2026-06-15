@@ -11,3 +11,4 @@ class FileProcessingResult:
     message: str | None = None
     transaction_count: int | None = None
     transaction_count_message: str | None = None
+    received_date: str | None = None

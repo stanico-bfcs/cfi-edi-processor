@@ -13,6 +13,7 @@ discover provider files
 prefix/skip checks
 duplicate TPM batch check
 preprocess when configured
+validate submitted X12 files when configured
 validate flat files
 count transactions
 run converter
@@ -76,6 +77,39 @@ Email delivery is disabled unless both config enables it and the CLI uses `--all
 Writes one transaction count report per run. Set `sendEmail: true` and configure `recipients` to send the report to the SFTP inbox. Email still requires global `email.enabled: true` and the CLI `--allow-email` switch.
 
 Flat files are counted by configured data rows. HSA, Health City, and other 837 files are counted by X12 `CLM` claim segments.
+
+`x12Validation`
+
+Checks submitted X12 files before converter execution. This currently protects HSA, Health City, and any future provider using 837/X12 input.
+
+The date-of-service rule validates `DTP*472*RD8*YYYYMMDD-YYYYMMDD` segments. Files are rejected with `x12_validation_failed` when the through date is earlier than the from date, for example:
+
+```text
+DTP*472*RD8*20260601-20260501~
+```
+
+`receivedDateOverrides`
+
+Reads optional received date overrides from:
+
+```text
+{sourceRoot}\CFI-Admin\received_dates.csv
+```
+
+CSV format:
+
+```csv
+provider,file_name,received_date
+HSA,H0000006_CAYMANFIRST_20260609_3252194.837i,2026-06-15
+```
+
+If a current file matches by provider and exact file name, the generated X12 is updated before publish:
+
+- `ISA09` = `YYMMDD`
+- `GS04` = `YYYYMMDD`
+- `BHT04` = `YYYYMMDD`
+
+If no override exists, the generated X12 is not modified. The CSV is deleted after a non-dry run only when it parsed successfully.
 
 ## Dry Run
 
@@ -261,8 +295,9 @@ C:\Path\To\dist\cfi-edi-processor
 8. Run live with `python main.py --allow-live --provider Kirk_Pharmacy`.
 9. Review run summary, converter logs, `INCOMING`, and archive folder.
 10. Confirm transaction count reports are generated under `logs/transaction_counts`.
-11. Keep email disabled until notification routing is intentionally verified.
-12. When ready, set `transactionReports.sendEmail: true`, configure the SFTP inbox recipient, and run with `--allow-email`.
+11. If using received date overrides, confirm `CFI-Admin\received_dates.csv` is deleted after a successful non-dry run.
+12. Keep email disabled until notification routing is intentionally verified.
+13. When ready, set `transactionReports.sendEmail: true`, configure the SFTP inbox recipient, and run with `--allow-email`.
 
 ## Current Known Deferred Items
 

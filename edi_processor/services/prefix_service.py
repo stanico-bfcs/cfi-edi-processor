@@ -111,7 +111,11 @@ class PrefixService:
             return PrefixResult(submission=submission, is_valid=True)
 
         submission.path.rename(destination)
-        renamed = FileSubmission(provider=submission.provider, path=destination)
+        renamed = FileSubmission(
+            provider=submission.provider,
+            path=destination,
+            received_date=submission.received_date,
+        )
         self.logger.info(
             f"Renamed {submission.file_name} to {destination.name}",
             extra={

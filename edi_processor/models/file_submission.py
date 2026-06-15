@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from edi_processor.config import ProviderSettings
@@ -10,6 +11,7 @@ from edi_processor.config import ProviderSettings
 class FileSubmission:
     provider: ProviderSettings
     path: Path
+    received_date: date | None = None
 
     @property
     def file_name(self) -> str:

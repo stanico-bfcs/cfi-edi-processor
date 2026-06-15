@@ -55,6 +55,7 @@ class ProcessingSummaryService:
                     "message",
                     "transaction_count",
                     "transaction_count_message",
+                    "received_date",
                 ),
             )
             writer.writeheader()

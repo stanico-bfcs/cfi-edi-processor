@@ -12,10 +12,13 @@
       "preprocessing_failed",
       "duplicate_skipped",
       "duplicate_check_failed",
+      "x12_validation_failed",
       "validation_failed",
       "converter_not_configured",
       "conversion_failed",
       "converter_output_verification_failed",
+      "x12_received_date_update_failed",
+      "x12_received_date_verification_failed",
       "publish_failed",
       "inbox_observation_not_found",
       "inbox_observation_zero_byte"
@@ -81,6 +84,21 @@
       "sftp-inbox@example.com"
     ],
     "subjectPrefix": "EDI transaction count report"
+  },
+  "receivedDateOverrides": {
+    "enabled": true,
+    "adminFolderName": "CFI-Admin",
+    "fileName": "received_dates.csv",
+    "dateFormat": "%Y-%m-%d",
+    "cleanup": "delete"
+  },
+  "x12Validation": {
+    "enabled": true,
+    "dateOfServiceEnabled": true,
+    "serviceDateSegment": "DTP",
+    "serviceDateQualifier": "472",
+    "rangeFormatQualifier": "RD8",
+    "requireServiceDate": true
   },
   "validationSchemas": [
     {

@@ -51,6 +51,7 @@ class TransactionReportService:
                     "status",
                     "transaction_count",
                     "transaction_count_message",
+                    "received_date",
                 ),
             )
             writer.writeheader()
@@ -62,6 +63,7 @@ class TransactionReportService:
                         "status": result.status,
                         "transaction_count": result.transaction_count,
                         "transaction_count_message": result.transaction_count_message,
+                        "received_date": result.received_date,
                     }
                 )
             writer.writerow(
@@ -71,5 +73,6 @@ class TransactionReportService:
                     "status": "",
                     "transaction_count": total,
                     "transaction_count_message": "",
+                    "received_date": "",
                 }
             )
