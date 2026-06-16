@@ -7,23 +7,32 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+from edi_processor.config import ProviderMetadataSettings
 from edi_processor.models.file_submission import FileSubmission
 from edi_processor.models.validation import ValidationResult
 
 
 class ValidationReportService:
-    def __init__(self, reports_directory: Path) -> None:
+    def __init__(
+        self,
+        reports_directory: Path,
+        source_root: Path,
+        provider_metadata: ProviderMetadataSettings,
+    ) -> None:
         self.reports_directory = reports_directory
+        self.source_root = source_root
+        self.provider_metadata = provider_metadata
         self.logger = logging.getLogger(__name__)
 
     def write_reports(
         self,
         submission: FileSubmission,
+        source_submission: FileSubmission,
         result: ValidationResult,
         run_id: str,
     ) -> tuple[Path, Path]:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_dir = self.reports_directory / datetime.now().strftime("%m-%d-%Y")
+        report_dir = self._report_directory(source_submission)
         report_dir.mkdir(parents=True, exist_ok=True)
 
         safe_stem = self._safe_stem(submission.path.stem)
@@ -70,9 +79,29 @@ class ValidationReportService:
         )
         return json_path, csv_path
 
+    def _report_directory(self, submission: FileSubmission) -> Path:
+        if not self.provider_metadata.enabled:
+            return self.reports_directory / datetime.now().strftime("%m-%d-%Y")
+
+        return (
+            self.source_root
+            / submission.provider.folder
+            / self.provider_metadata.folder_name
+            / datetime.now().strftime(self.provider_metadata.date_format)
+            / self._safe_path_component(submission.file_name)
+        )
+
     def _safe_stem(self, value: str) -> str:
         safe = "".join(character if character.isalnum() else "_" for character in value)
         return safe.strip("_") or "file"
+
+    def _safe_path_component(self, value: str) -> str:
+        invalid = '<>:"/\\|?*'
+        safe = "".join(
+            "_" if character in invalid or ord(character) < 32 else character
+            for character in value
+        )
+        return safe.strip(" .") or "file"
 
     def _unique_destination(self, destination: Path) -> Path:
         if not destination.exists():

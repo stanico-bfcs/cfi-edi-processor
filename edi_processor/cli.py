@@ -16,8 +16,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", default="appsettings.json")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--allow-email", action="store_true")
-    parser.add_argument("--allow-live", action="store_true")
+    parser.add_argument("--allow-email", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--allow-live", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--provider", action="append", default=[])
     args = parser.parse_args(argv)
 
@@ -28,8 +28,6 @@ def main(argv: list[str] | None = None) -> int:
     settings = load_settings(config_path)
     context = create_run_context(
         dry_run=args.dry_run,
-        allow_email=args.allow_email,
-        allow_live=args.allow_live,
         provider_filter=tuple(args.provider),
     )
     log_path = configure_logging(settings.runtime.logs_directory, context.run_id)

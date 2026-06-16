@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
@@ -27,16 +26,22 @@ class ProviderNotificationService:
         self,
         submission: FileSubmission,
         validation_result: ValidationResult,
+        metadata_directory: Path,
         run_id: str,
     ) -> NotificationRenderResult:
+        report_date = datetime.now().strftime("%m-%d-%Y")
         template_data = {
             "run_id": run_id,
             "provider_key": submission.provider.key,
             "provider_name": submission.provider.name,
             "file_name": submission.file_name,
-            "issues": [asdict(issue) for issue in validation_result.issues],
+            "issue_count": len(validation_result.issues),
+            "metadata_directory": str(metadata_directory),
+            "report_date": report_date,
         }
-        subject = f"Validation failed: {submission.provider.name} - {submission.file_name}"
+        subject = (
+            f"{submission.provider.name} - Provider File Requires Correction - {report_date}"
+        )
         try:
             environment = self._jinja_environment()
             text_body = environment.get_template(
@@ -114,52 +119,31 @@ class ProviderNotificationService:
 
     def _fallback_text(self, data: dict) -> str:
         lines = [
-            f"Provider: {data['provider_name']}",
-            f"File: {data['file_name']}",
-            f"Received/Run ID: {data['run_id']}",
-            f"Issue count: {len(data['issues'])}",
+            f"Dear {data['provider_name']},",
             "",
-            "Validation issues:",
+            "We could not process the submitted file because it failed validation.",
+            f"File: {data['file_name']}",
+            f"Issue count: {data['issue_count']}",
+            f"Correction details are available in your metadata folder: {data['metadata_directory']}",
+            "",
+            "No validation reports or source data are attached to this email.",
+            "Please correct the file and resubmit it.",
+            "",
+            "Regards,",
         ]
-        for issue in data["issues"]:
-            lines.extend(
-                [
-                    f"- Severity: {issue['severity']}",
-                    f"  Code: {issue['error_code']}",
-                    f"  Row: {issue['row_number'] or ''}",
-                    f"  Field: {issue['field_name'] or ''}",
-                    f"  Message: {issue['message']}",
-                    f"  Raw Value: {issue['raw_value'] or ''}",
-                    f"  Suggested Fix: {issue['suggested_fix'] or ''}",
-                ]
-            )
         return "\n".join(lines)
 
     def _fallback_html(self, data: dict) -> str:
-        rows = "\n".join(
-            "<tr>"
-            f"<td>{issue['severity']}</td>"
-            f"<td>{issue['error_code']}</td>"
-            f"<td>{issue['row_number'] or ''}</td>"
-            f"<td>{issue['field_name'] or ''}</td>"
-            f"<td>{issue['message']}</td>"
-            f"<td>{issue['raw_value'] or ''}</td>"
-            f"<td>{issue['suggested_fix'] or ''}</td>"
-            "</tr>"
-            for issue in data["issues"]
-        )
         return (
             "<!DOCTYPE html><html><body>"
-            f"<p>Provider: {data['provider_name']}</p>"
+            f"<p>Dear {data['provider_name']},</p>"
+            "<p>We could not process the submitted file because it failed validation.</p>"
             f"<p>File: {data['file_name']}</p>"
-            f"<p>Received/Run ID: {data['run_id']}</p>"
-            f"<p>Issue count: {len(data['issues'])}</p>"
-            "<table border=\"1\"><thead><tr>"
-            "<th>Severity</th><th>Code</th><th>Row</th><th>Field</th>"
-            "<th>Message</th><th>Raw Value</th><th>Suggested Fix</th>"
-            "</tr></thead><tbody>"
-            f"{rows}"
-            "</tbody></table>"
+            f"<p>Issue count: {data['issue_count']}</p>"
+            f"<p>Correction details are available in your metadata folder: {data['metadata_directory']}</p>"
+            "<p>No validation reports or source data are attached to this email.</p>"
+            "<p>Please correct the file and resubmit it.</p>"
+            "<p>Regards,</p>"
             "</body></html>"
         )
 

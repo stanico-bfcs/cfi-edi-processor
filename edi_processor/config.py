@@ -18,6 +18,14 @@ class RuntimeSettings:
 
 
 @dataclass(frozen=True)
+class WorkCleanupSettings:
+    enabled: bool = True
+    delete_on_success: bool = True
+    delete_on_failure: bool = True
+    delete_on_dry_run: bool = False
+
+
+@dataclass(frozen=True)
 class EmailSettings:
     enabled: bool = False
     send_provider_validation_emails: bool = False
@@ -55,6 +63,13 @@ class X12ValidationSettings:
     service_date_qualifier: str = "472"
     range_format_qualifier: str = "RD8"
     require_service_date: bool = True
+
+
+@dataclass(frozen=True)
+class ProviderMetadataSettings:
+    enabled: bool = True
+    folder_name: str = "Processed"
+    date_format: str = "%m-%d-%Y"
 
 
 @dataclass(frozen=True)
@@ -144,6 +159,24 @@ class ValidationSettings:
 
 
 @dataclass(frozen=True)
+class DiagnosisRoundingSettings:
+    enabled: bool = True
+    decimal_places: int = 0
+    mode: str = "half_up"
+
+
+@dataclass(frozen=True)
+class DiagnosisMappingSettings:
+    enabled: bool = False
+    numerator_field: str = ""
+    denominator_field: str = ""
+    rounding: DiagnosisRoundingSettings = field(default_factory=DiagnosisRoundingSettings)
+    allowed_percentages: dict[str, str] = field(default_factory=dict)
+    reject_unmapped_percentages: bool = True
+    x12_qualifier: str = "ABK"
+
+
+@dataclass(frozen=True)
 class ValidationField:
     name: str
     required: bool = False
@@ -188,6 +221,9 @@ class ProviderSettings:
     file_format: FileFormatSettings = field(default_factory=FileFormatSettings)
     preprocessing: PreprocessingSettings = field(default_factory=PreprocessingSettings)
     validation: ValidationSettings = field(default_factory=ValidationSettings)
+    diagnosis_mapping: DiagnosisMappingSettings = field(
+        default_factory=DiagnosisMappingSettings
+    )
     converter: str | None = None
     notes: tuple[str, ...] = ()
 
@@ -195,6 +231,7 @@ class ProviderSettings:
 @dataclass(frozen=True)
 class AppSettings:
     runtime: RuntimeSettings = field(default_factory=RuntimeSettings)
+    work_cleanup: WorkCleanupSettings = field(default_factory=WorkCleanupSettings)
     email: EmailSettings = field(default_factory=EmailSettings)
     transaction_reports: TransactionReportSettings = field(
         default_factory=TransactionReportSettings
@@ -203,6 +240,9 @@ class AppSettings:
         default_factory=ReceivedDateOverrideSettings
     )
     x12_validation: X12ValidationSettings = field(default_factory=X12ValidationSettings)
+    provider_metadata: ProviderMetadataSettings = field(
+        default_factory=ProviderMetadataSettings
+    )
     paths: PathSettings = field(default_factory=PathSettings)
     converters: ConverterSettings = field(default_factory=ConverterSettings)
     publish: PublishSettings = field(default_factory=PublishSettings)
@@ -234,10 +274,12 @@ def load_settings(config_path: Path) -> AppSettings:
     base_dir = config_path.parent
 
     runtime_data = data.get("runtime", {})
+    work_cleanup_data = data.get("workCleanup", {})
     email_data = data.get("email", {})
     transaction_reports_data = data.get("transactionReports", {})
     received_date_overrides_data = data.get("receivedDateOverrides", {})
     x12_validation_data = data.get("x12Validation", {})
+    provider_metadata_data = data.get("providerMetadata", {})
     paths_data = data.get("paths", {})
     converters_data = data.get("converters", {})
     publish_data = data.get("publish", {})
@@ -254,6 +296,13 @@ def load_settings(config_path: Path) -> AppSettings:
         fail_on_file_statuses=tuple(
             str(item) for item in runtime_data.get("failOnFileStatuses", [])
         ),
+    )
+
+    work_cleanup = WorkCleanupSettings(
+        enabled=bool(work_cleanup_data.get("enabled", True)),
+        delete_on_success=bool(work_cleanup_data.get("deleteOnSuccess", True)),
+        delete_on_failure=bool(work_cleanup_data.get("deleteOnFailure", True)),
+        delete_on_dry_run=bool(work_cleanup_data.get("deleteOnDryRun", False)),
     )
 
     email = EmailSettings(
@@ -301,6 +350,12 @@ def load_settings(config_path: Path) -> AppSettings:
         service_date_qualifier=str(x12_validation_data.get("serviceDateQualifier", "472")),
         range_format_qualifier=str(x12_validation_data.get("rangeFormatQualifier", "RD8")),
         require_service_date=bool(x12_validation_data.get("requireServiceDate", True)),
+    )
+
+    provider_metadata = ProviderMetadataSettings(
+        enabled=bool(provider_metadata_data.get("enabled", True)),
+        folder_name=str(provider_metadata_data.get("folderName", "Processed")),
+        date_format=str(provider_metadata_data.get("dateFormat", "%m-%d-%Y")),
     )
 
     paths = PathSettings(
@@ -378,10 +433,12 @@ def load_settings(config_path: Path) -> AppSettings:
 
     settings = AppSettings(
         runtime=runtime,
+        work_cleanup=work_cleanup,
         email=email,
         transaction_reports=transaction_reports,
         received_date_overrides=received_date_overrides,
         x12_validation=x12_validation,
+        provider_metadata=provider_metadata,
         paths=paths,
         converters=converters,
         publish=publish,
@@ -400,6 +457,7 @@ def _load_provider(data: dict[str, Any]) -> ProviderSettings:
     file_format_data = data.get("fileFormat", {})
     preprocessing_data = data.get("preprocessing", {})
     validation_data = data.get("validation", {})
+    diagnosis_mapping_data = data.get("diagnosisMapping", {})
 
     return ProviderSettings(
         key=str(data["key"]),
@@ -435,6 +493,7 @@ def _load_provider(data: dict[str, Any]) -> ProviderSettings:
             enabled=bool(validation_data.get("enabled", True)),
             schema=validation_data.get("schema"),
         ),
+        diagnosis_mapping=_load_diagnosis_mapping(diagnosis_mapping_data),
         converter=data.get("converter"),
         notes=tuple(str(item) for item in data.get("notes", [])),
     )
@@ -447,6 +506,27 @@ def _load_notification(data: dict[str, Any]) -> NotificationSettings:
             str(key): _load_notification(value)
             for key, value in data.get("subLocations", {}).items()
         },
+    )
+
+
+def _load_diagnosis_mapping(data: dict[str, Any]) -> DiagnosisMappingSettings:
+    source_fields = data.get("sourceFields", {})
+    rounding_data = data.get("rounding", {})
+    return DiagnosisMappingSettings(
+        enabled=bool(data.get("enabled", False)),
+        numerator_field=str(source_fields.get("numerator", "")),
+        denominator_field=str(source_fields.get("denominator", "")),
+        rounding=DiagnosisRoundingSettings(
+            enabled=bool(rounding_data.get("enabled", True)),
+            decimal_places=int(rounding_data.get("decimalPlaces", 0)),
+            mode=str(rounding_data.get("mode", "half_up")),
+        ),
+        allowed_percentages={
+            str(key): str(value)
+            for key, value in data.get("allowedPercentages", {}).items()
+        },
+        reject_unmapped_percentages=bool(data.get("rejectUnmappedPercentages", True)),
+        x12_qualifier=str(data.get("x12Qualifier", "ABK")),
     )
 
 
@@ -511,6 +591,31 @@ def _validate_settings(settings: AppSettings) -> None:
 
     if settings.received_date_overrides.cleanup not in {"delete", "keep"}:
         raise ValueError("receivedDateOverrides.cleanup must be either 'delete' or 'keep'.")
+
+    invalid_rounding_modes = [
+        provider.key
+        for provider in settings.providers
+        if provider.diagnosis_mapping.enabled
+        and provider.diagnosis_mapping.rounding.mode
+        not in {"half_up", "half_even", "floor", "ceiling", "truncate"}
+    ]
+    if invalid_rounding_modes:
+        providers = ", ".join(sorted(invalid_rounding_modes))
+        raise ValueError(f"Unsupported diagnosisMapping.rounding.mode for: {providers}")
+
+    incomplete_diagnosis_mapping = [
+        provider.key
+        for provider in settings.providers
+        if provider.diagnosis_mapping.enabled
+        and (
+            not provider.diagnosis_mapping.numerator_field
+            or not provider.diagnosis_mapping.denominator_field
+            or not provider.diagnosis_mapping.allowed_percentages
+        )
+    ]
+    if incomplete_diagnosis_mapping:
+        providers = ", ".join(sorted(incomplete_diagnosis_mapping))
+        raise ValueError(f"Incomplete diagnosisMapping settings for: {providers}")
 
 
 def _resolve_path(base_dir: Path, value: Any) -> Path:

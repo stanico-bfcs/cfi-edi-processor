@@ -11,6 +11,7 @@ from edi_processor.models.validation import ValidationResult
 from edi_processor.runtime import RunContext
 from edi_processor.services.archive_service import ArchiveService
 from edi_processor.services.converter_service import ConverterService
+from edi_processor.services.diagnosis_mapping_service import DiagnosisMappingService
 from edi_processor.services.duplicate_check_service import DuplicateCheckService
 from edi_processor.services.email_service import EmailService
 from edi_processor.services.file_discovery_service import FileDiscoveryService
@@ -27,7 +28,9 @@ from edi_processor.services.transaction_count_service import TransactionCountSer
 from edi_processor.services.transaction_report_service import TransactionReportService
 from edi_processor.services.validation_report_service import ValidationReportService
 from edi_processor.services.validation_service import ValidationService
+from edi_processor.services.work_cleanup_service import WorkCleanupService
 from edi_processor.services.x12_date_update_service import X12DateUpdateService
+from edi_processor.services.x12_diagnosis_update_service import X12DiagnosisUpdateService
 from edi_processor.services.x12_validation_service import X12ValidationService
 
 
@@ -43,6 +46,10 @@ class Orchestrator:
             settings=settings.received_date_overrides,
         )
         self.archive_service = ArchiveService()
+        self.work_cleanup_service = WorkCleanupService(
+            settings.runtime.working_directory,
+            settings.work_cleanup,
+        )
         self.staging_service = StagingService(settings.runtime.working_directory)
         self.prefix_service = PrefixService()
         self.duplicate_check_service = DuplicateCheckService(settings.duplicate_check)
@@ -50,12 +57,15 @@ class Orchestrator:
         self.transaction_count_service = TransactionCountService(settings.validation_schemas)
         self.transaction_report_service = TransactionReportService(settings.runtime.logs_directory)
         self.validation_service = ValidationService(settings.validation_schemas)
+        self.diagnosis_mapping_service = DiagnosisMappingService(settings.validation_schemas)
         self.x12_validation_service = X12ValidationService(
             settings.x12_validation,
             settings.runtime.working_directory,
         )
         self.validation_report_service = ValidationReportService(
-            settings.paths.validation_reports_directory
+            reports_directory=settings.paths.validation_reports_directory,
+            source_root=settings.paths.source_root,
+            provider_metadata=settings.provider_metadata,
         )
         self.email_service = EmailService(settings.email)
         self.file_verification_service = FileVerificationService()
@@ -66,6 +76,7 @@ class Orchestrator:
         )
         self.converter_service = ConverterService(settings.paths, settings.converters)
         self.x12_date_update_service = X12DateUpdateService()
+        self.x12_diagnosis_update_service = X12DiagnosisUpdateService()
         self.publish_service = IncomingPublishService(settings.publish)
         self.inbox_observer_service = InboxObserverService(settings.publish)
 
@@ -142,6 +153,12 @@ class Orchestrator:
             run_id=self.context.run_id,
             dry_run=self.context.dry_run,
         )
+        self.work_cleanup_service.cleanup_run(
+            run_id=self.context.run_id,
+            date_folder=started_at.strftime("%m-%d-%Y"),
+            exit_code=exit_code,
+            dry_run=self.context.dry_run,
+        )
 
         self.logger.info(
             "Run completed",
@@ -156,9 +173,6 @@ class Orchestrator:
     def _validate_runtime_safety(self) -> None:
         if self.context.dry_run:
             return
-
-        if not self.context.allow_live:
-            raise RuntimeError("Live processing requires --allow-live.")
 
         allowed = set(self.settings.runtime.live_provider_allow_list)
         if not allowed:
@@ -292,6 +306,7 @@ class Orchestrator:
         if not x12_validation_result.is_valid:
             return self._handle_validation_failure(
                 submission=processed_submission,
+                original_submission=original_submission,
                 validation_result=x12_validation_result,
                 transaction_count=transaction_count,
                 transaction_count_message=transaction_count_message,
@@ -305,7 +320,21 @@ class Orchestrator:
         if not validation_result.is_valid:
             return self._handle_validation_failure(
                 submission=processed_submission,
+                original_submission=original_submission,
                 validation_result=validation_result,
+                transaction_count=transaction_count,
+                transaction_count_message=transaction_count_message,
+                status="validation_failed",
+            )
+
+        diagnosis_mapping_result = self.diagnosis_mapping_service.map_for_submission(
+            processed_submission
+        )
+        if not diagnosis_mapping_result.is_valid:
+            return self._handle_validation_failure(
+                submission=processed_submission,
+                original_submission=original_submission,
+                validation_result=diagnosis_mapping_result.validation_result,
                 transaction_count=transaction_count,
                 transaction_count_message=transaction_count_message,
                 status="validation_failed",
@@ -372,6 +401,37 @@ class Orchestrator:
                     file_name=processed_submission.file_name,
                     status="converter_output_verification_failed",
                     message=output_verification.message,
+                    transaction_count=transaction_count,
+                    transaction_count_message=transaction_count_message,
+                    received_date=self._received_date_text(processed_submission),
+                )
+
+            diagnosis_update_result = (
+                self.x12_diagnosis_update_service.update_diagnosis_codes(
+                    path=expected_output,
+                    mappings=diagnosis_mapping_result.mappings,
+                    qualifier=processed_submission.provider.diagnosis_mapping.x12_qualifier,
+                    run_id=self.context.run_id,
+                    provider_key=processed_submission.provider.key,
+                    file_name=processed_submission.file_name,
+                )
+            )
+            if not diagnosis_update_result.succeeded:
+                self.logger.error(
+                    diagnosis_update_result.message,
+                    extra={
+                        "run_id": self.context.run_id,
+                        "provider": processed_submission.provider.key,
+                        "file_name": processed_submission.file_name,
+                        "status": "x12_diagnosis_update_failed",
+                        "error": diagnosis_update_result.error_code,
+                    },
+                )
+                return FileProcessingResult(
+                    provider_key=processed_submission.provider.key,
+                    file_name=processed_submission.file_name,
+                    status="x12_diagnosis_update_failed",
+                    message=diagnosis_update_result.message,
                     transaction_count=transaction_count,
                     transaction_count_message=transaction_count_message,
                     received_date=self._received_date_text(processed_submission),
@@ -531,6 +591,7 @@ class Orchestrator:
     def _handle_validation_failure(
         self,
         submission: FileSubmission,
+        original_submission: FileSubmission,
         validation_result: ValidationResult,
         transaction_count: int | None,
         transaction_count_message: str | None,
@@ -538,12 +599,14 @@ class Orchestrator:
     ) -> FileProcessingResult:
         report_paths = self.validation_report_service.write_reports(
             submission=submission,
+            source_submission=original_submission,
             result=validation_result,
             run_id=self.context.run_id,
         )
         notification = self.provider_notification_service.render_validation_failed(
             submission=submission,
             validation_result=validation_result,
+            metadata_directory=report_paths[0].parent,
             run_id=self.context.run_id,
         )
         for issue in validation_result.issues:
@@ -584,10 +647,15 @@ class Orchestrator:
                 recipients=notification.recipients,
                 text_body=text_body,
                 html_body=html_body,
-                attachments=(*report_paths, notification.text_path, notification.html_path),
+                attachments=(),
                 run_id=self.context.run_id,
-                allow_email=self.context.allow_email,
             )
+        archive_plan = self.archive_service.plan(original_submission, datetime.now())
+        self.archive_service.execute(
+            plan=archive_plan,
+            run_id=self.context.run_id,
+            dry_run=self.context.dry_run,
+        )
         return FileProcessingResult(
             provider_key=submission.provider.key,
             file_name=submission.file_name,
@@ -614,7 +682,6 @@ class Orchestrator:
             html_body=None,
             attachments=report_paths,
             run_id=self.context.run_id,
-            allow_email=self.context.allow_email,
         )
 
     def _expected_result_logs(self, converter_key: str) -> tuple[Path, ...]:

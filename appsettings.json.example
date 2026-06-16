@@ -18,12 +18,19 @@
       "converter_not_configured",
       "conversion_failed",
       "converter_output_verification_failed",
+      "x12_diagnosis_update_failed",
       "x12_received_date_update_failed",
       "x12_received_date_verification_failed",
       "publish_failed",
       "inbox_observation_not_found",
       "inbox_observation_zero_byte"
     ]
+  },
+  "workCleanup": {
+    "enabled": true,
+    "deleteOnSuccess": true,
+    "deleteOnFailure": true,
+    "deleteOnDryRun": false
   },
   "paths": {
     "sourceRoot": "C:\\EDI\\SFTPRoot",
@@ -101,6 +108,11 @@
     "serviceDateQualifier": "472",
     "rangeFormatQualifier": "RD8",
     "requireServiceDate": true
+  },
+  "providerMetadata": {
+    "enabled": true,
+    "folderName": "Processed",
+    "dateFormat": "%m-%d-%Y"
   },
   "validationSchemas": [
     {
@@ -642,6 +654,25 @@
       "validation": {
         "enabled": true,
         "schema": "valu_med_pharmacy_csv"
+      },
+      "diagnosisMapping": {
+        "enabled": true,
+        "sourceFields": {
+          "numerator": "CoPay-CI",
+          "denominator": "Price-CI"
+        },
+        "rounding": {
+          "enabled": true,
+          "decimalPlaces": 0,
+          "mode": "half_up"
+        },
+        "allowedPercentages": {
+          "5": "Z029",
+          "10": "Z760",
+          "25": "Z760"
+        },
+        "rejectUnmappedPercentages": true,
+        "x12Qualifier": "ABK"
       },
       "converter": "rxFlatfileTo837P"
     },

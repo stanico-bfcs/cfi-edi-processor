@@ -23,9 +23,8 @@ class EmailService:
         html_body: str | None,
         attachments: tuple[Path, ...],
         run_id: str,
-        allow_email: bool,
     ) -> bool:
-        if not self._can_send(recipients, allow_email, run_id):
+        if not self._can_send(recipients, run_id):
             return False
 
         message = EmailMessage()
@@ -56,18 +55,11 @@ class EmailService:
         )
         return True
 
-    def _can_send(self, recipients: tuple[str, ...], allow_email: bool, run_id: str) -> bool:
+    def _can_send(self, recipients: tuple[str, ...], run_id: str) -> bool:
         if not self.settings.enabled:
             self.logger.info(
                 "Email sending disabled by configuration",
                 extra={"run_id": run_id, "status": "email_disabled"},
-            )
-            return False
-
-        if not allow_email:
-            self.logger.info(
-                "Email sending blocked because --allow-email was not provided",
-                extra={"run_id": run_id, "status": "email_runtime_blocked"},
             )
             return False
 

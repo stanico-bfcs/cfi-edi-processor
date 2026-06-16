@@ -1,17 +1,14 @@
-Provider: {{ provider_name }}
+Dear {{ provider_name }},
+
+We could not process the submitted file because it failed validation.
+
 File: {{ file_name }}
-Received/Run ID: {{ run_id }}
-Issue count: {{ issues|length }}
+Report date: {{ report_date }}
+Issue count: {{ issue_count }}
 
-Validation issues:
-{% for issue in issues %}
-- Severity: {{ issue.severity }}
-  Code: {{ issue.error_code }}
-  Row: {{ issue.row_number or "" }}
-  Field: {{ issue.field_name or "" }}
-  Message: {{ issue.message }}
-  Raw Value: {{ issue.raw_value or "" }}
-  Suggested Fix: {{ issue.suggested_fix or "" }}
-{% endfor %}
+Correction details are available in the following folder:
+{{ metadata_directory }}
 
-Please correct the listed issues and resubmit the file.
+Please correct the file and resubmit it.
+
+Regards,

@@ -57,11 +57,17 @@ Providers allowed to run live. Keep this narrow during pilot, currently `Kirk_Ph
 
 File statuses that should make a live run return exit code `2`.
 
+`workCleanup`
+
+Deletes run-scoped working copies under `work/staged`, `work/preprocessed`, and `work/x12_validation` at the end of a run. This cleanup does not delete logs, provider metadata, converter logs, run summaries, or published output. Live runs currently clean up on success and failure; dry-run cleanup is disabled by default so inspection artifacts remain available.
+
 `paths`
 
 Configure source provider root, QDS processor folders, `C:\Files\INCOMING`, `C:\Files\INBOX`, logs, templates, and converter output folders.
 
 Provider root files are discovered and then copied to `work/staged/{MM-DD-YYYY}/{run_id}/{provider}/`. Prefix derivation, validation, preprocessing, transaction counting, and converter execution use the staged copy. The original provider-root file is only moved during final archive after successful processing.
+
+Files rejected by flat-file or X12 validation are also archived from the provider root after validation reports and notification artifacts are written. This keeps watched provider roots from repeatedly rediscovering the same bad file.
 
 `publish`
 
@@ -77,11 +83,11 @@ select file_name from batch where file_name like '%{file_name}%'
 
 `email`
 
-Email delivery is disabled unless both config enables it and the CLI uses `--allow-email`.
+Email delivery is disabled unless config enables it.
 
 `transactionReports`
 
-Writes one transaction count report per run. Set `sendEmail: true` and configure `recipients` to send the report to the SFTP inbox. Email still requires global `email.enabled: true` and the CLI `--allow-email` switch.
+Writes one transaction count report per run. Set `sendEmail: true` and configure `recipients` to send the report to the SFTP inbox. Email also requires global `email.enabled: true`.
 
 Flat files are counted by configured data rows. HSA, Health City, and other 837 files are counted by X12 `CLM` claim segments.
 
@@ -94,6 +100,34 @@ The date-of-service rule validates `DTP*472*RD8*YYYYMMDD-YYYYMMDD` segments. Fil
 ```text
 DTP*472*RD8*20260601-20260501~
 ```
+
+`diagnosisMapping`
+
+Valu-Med Pharmacy has a provider-specific diagnosis rule. For each accepted source row, the processor calculates:
+
+```text
+(CoPay-CI / Price-CI) * 100
+```
+
+The percentage is rounded according to the provider's `diagnosisMapping.rounding` config. The current mapping is:
+
+```text
+5%  -> Z02.9, written to X12 as Z029
+10% -> Z76.0, written to X12 as Z760
+25% -> Z76.0, written to X12 as Z760
+```
+
+Any unmapped rounded percentage rejects the file during validation. The row-level reason is written to the provider metadata folder, while the provider email remains attachment-free and PHI-safe. After the converter runs, the generated X12 `HI*ABK:` segments are updated in source-row order and verified before publish.
+
+`providerMetadata`
+
+Controls where provider-visible validation metadata is written. When enabled, validation JSON/CSV files are written under:
+
+```text
+{sourceRoot}\{providerFolder}\Processed\{MM-DD-YYYY}\{submitted_file_name}\
+```
+
+Provider validation emails do not attach validation reports, rendered email copies, or source files. The email only identifies the failed file, issue count, and metadata folder so PHI-bearing details are not sent through insecure email.
 
 `receivedDateOverrides`
 
@@ -143,20 +177,19 @@ python main.py --dry-run --config appsettings.json.example
 Only run live after paths, converters, duplicate check, and notification settings are confirmed.
 
 ```powershell
-python main.py --allow-live
+python main.py
 ```
 
 Live runs require:
 
-- `--allow-live`
 - at least one provider listed in `runtime.liveProviderAllowList`
 
-Without `--provider`, live processing discovers providers from `runtime.liveProviderAllowList`. Passing `--provider` narrows the run further, and requested providers must still be in the allow-list.
+Without `--provider`, live processing discovers providers from `runtime.liveProviderAllowList`. Passing `--provider` narrows the run further, and requested providers must still be in the allow-list. Use `--dry-run` for non-live inspection.
 
 Email sending additionally requires:
 
 ```powershell
-python main.py --allow-live --allow-email
+python main.py
 ```
 
 ## Exit Codes
@@ -188,7 +221,13 @@ logs/runs/{MM-DD-YYYY}/{run_id}_summary.json
 logs/runs/{MM-DD-YYYY}/{run_id}_files.csv
 ```
 
-Validation reports:
+Validation metadata for provider correction:
+
+```text
+{sourceRoot}\{providerFolder}\Processed\{MM-DD-YYYY}\{submitted_file_name}\
+```
+
+Fallback validation reports when `providerMetadata.enabled` is false:
 
 ```text
 logs/validation/{MM-DD-YYYY}/
@@ -232,7 +271,7 @@ python
 Arguments:
 
 ```text
-main.py --allow-live
+main.py
 ```
 
 Start in:
@@ -284,7 +323,7 @@ C:\Path\To\dist\Cayman First EDI Processor\Cayman First EDI Processor.exe
 Arguments:
 
 ```text
---config C:\EDI\config\appsettings.json --env-file C:\EDI\config\.env --allow-live
+--config C:\EDI\config\appsettings.json --env-file C:\EDI\config\.env
 ```
 
 Start in:
@@ -302,12 +341,12 @@ C:\Path\To\dist\Cayman First EDI Processor
 5. Run `python main.py --dry-run --provider Kirk_Pharmacy`.
 6. Review `logs/runs/{date}/{run_id}_summary.json`.
 7. Confirm validation reports are expected or fix provider data/rules.
-8. Run live with `python main.py --allow-live`.
+8. Run live with `python main.py`.
 9. Review run summary, converter logs, `INCOMING`, and archive folder.
 10. Confirm transaction count reports are generated under `logs/transaction_counts`.
 11. If using received date overrides, confirm `CFI-Admin\received_dates.csv` is deleted after a successful non-dry run.
 12. Keep email disabled until notification routing is intentionally verified.
-13. When ready, set `transactionReports.sendEmail: true`, configure the SFTP inbox recipient, and run with `--allow-email`.
+13. When ready, set `transactionReports.sendEmail: true`, configure the SFTP inbox recipient, and confirm `email.enabled: true`.
 
 ## Current Known Deferred Items
 
