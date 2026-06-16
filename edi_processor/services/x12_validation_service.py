@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from datetime import date, datetime
 from pathlib import Path
 
@@ -10,16 +11,32 @@ from edi_processor.models.validation import ValidationIssue, ValidationResult
 
 
 class X12ValidationService:
-    def __init__(self, settings: X12ValidationSettings) -> None:
+    def __init__(self, settings: X12ValidationSettings, working_directory: Path) -> None:
         self.settings = settings
+        self.working_directory = working_directory
         self.logger = logging.getLogger(__name__)
 
     def validate(self, submission: FileSubmission, run_id: str) -> ValidationResult:
         if not self._should_validate(submission):
             return ValidationResult(is_valid=True)
 
+        staged_path = self._stage_copy(submission, run_id)
+        if staged_path is None:
+            return ValidationResult(
+                is_valid=False,
+                issues=(
+                    ValidationIssue(
+                        row_number=None,
+                        field_name="DTP",
+                        severity="error",
+                        error_code="X12_STAGE_COPY_FAILED",
+                        message="Could not copy the submitted X12 file for validation.",
+                    ),
+                ),
+            )
+
         try:
-            content = self._read_text(submission.path)
+            content = self._read_text(staged_path)
         except OSError as exc:
             return ValidationResult(
                 is_valid=False,
@@ -57,6 +74,44 @@ class X12ValidationService:
             ".837p",
             ".x12",
         }
+
+    def _stage_copy(self, submission: FileSubmission, run_id: str) -> Path | None:
+        date_folder = datetime.now().strftime("%m-%d-%Y")
+        destination_dir = (
+            self.working_directory
+            / "x12_validation"
+            / date_folder
+            / run_id
+            / submission.provider.key
+        )
+        destination = self._unique_destination(destination_dir / submission.path.name)
+
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(submission.path, destination)
+        except OSError as exc:
+            self.logger.error(
+                f"Could not stage X12 validation copy: {exc}",
+                extra={
+                    "run_id": run_id,
+                    "provider": submission.provider.key,
+                    "file_name": submission.file_name,
+                    "status": "x12_validation_copy_failed",
+                    "error": "X12_STAGE_COPY_FAILED",
+                },
+            )
+            return None
+
+        self.logger.info(
+            f"Staged X12 validation copy: {destination}",
+            extra={
+                "run_id": run_id,
+                "provider": submission.provider.key,
+                "file_name": submission.file_name,
+                "status": "x12_validation_copy_staged",
+            },
+        )
+        return destination
 
     def _validate_date_of_service(self, content: str) -> ValidationResult:
         issues: list[ValidationIssue] = []
@@ -161,3 +216,18 @@ class X12ValidationService:
             return path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             return path.read_text(encoding="cp1252")
+
+    def _unique_destination(self, destination: Path) -> Path:
+        if not destination.exists():
+            return destination
+
+        stem = destination.stem
+        suffix = destination.suffix
+        parent = destination.parent
+        counter = 1
+
+        while True:
+            candidate = parent / f"{stem}_({counter}){suffix}"
+            if not candidate.exists():
+                return candidate
+            counter += 1

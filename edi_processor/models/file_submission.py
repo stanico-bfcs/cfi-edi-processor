@@ -31,3 +31,11 @@ class PrefixResult:
     is_valid: bool
     message: str | None = None
     error_code: str | None = None
+
+
+@dataclass(frozen=True)
+class StagingResult:
+    submission: FileSubmission
+    succeeded: bool
+    message: str | None = None
+    error_code: str | None = None

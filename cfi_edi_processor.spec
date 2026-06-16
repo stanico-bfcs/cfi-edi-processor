@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 ROOT = Path.cwd()
+APP_NAME = "Cayman First EDI Processor"
+ICON_PATH = ROOT / "assets" / f"BF_Pinion.png"
 
 
 a = Analysis(
@@ -15,7 +17,10 @@ a = Analysis(
         ("appsettings.json.example", "."),
         (".env.example", "."),
     ],
-    hiddenimports=[],
+    hiddenimports=[
+        "jinja2",
+        "pyodbc",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -30,7 +35,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="cfi-edi-processor",
+    name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -41,6 +46,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=str(ICON_PATH),
     contents_directory=".",
 )
 coll = COLLECT(
@@ -50,5 +56,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="cfi-edi-processor",
+    name=APP_NAME,
 )

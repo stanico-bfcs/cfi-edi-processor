@@ -10,6 +10,7 @@ The runtime flow is:
 
 ```text
 discover provider files
+stage provider files into work directory
 prefix/skip checks
 duplicate TPM batch check
 preprocess when configured
@@ -60,6 +61,8 @@ File statuses that should make a live run return exit code `2`.
 
 Configure source provider root, QDS processor folders, `C:\Files\INCOMING`, `C:\Files\INBOX`, logs, templates, and converter output folders.
 
+Provider root files are discovered and then copied to `work/staged/{MM-DD-YYYY}/{run_id}/{provider}/`. Prefix derivation, validation, preprocessing, transaction counting, and converter execution use the staged copy. The original provider-root file is only moved during final archive after successful processing.
+
 `duplicateCheck`
 
 Optional TPM duplicate check against `batch.file_name`. The default `matchMode: "contains"` mirrors the legacy query:
@@ -80,7 +83,7 @@ Flat files are counted by configured data rows. HSA, Health City, and other 837 
 
 `x12Validation`
 
-Checks submitted X12 files before converter execution. This currently protects HSA, Health City, and any future provider using 837/X12 input.
+Checks submitted X12 files before converter execution. The submitted file is first copied under `work/x12_validation/{MM-DD-YYYY}/{run_id}/{provider}/`, then the staged copy is read and validated. This currently protects HSA, Health City, and any future provider using 837/X12 input.
 
 The date-of-service rule validates `DTP*472*RD8*YYYYMMDD-YYYYMMDD` segments. Files are rejected with `x12_validation_failed` when the through date is earlier than the from date, for example:
 
@@ -230,7 +233,7 @@ main.py --allow-live --provider Kirk_Pharmacy
 Start in:
 
 ```text
-C:\Path\To\cfi-edi-processor
+C:\Path\To\Cayman First EDI Processor
 ```
 
 ## PyInstaller Packaging
@@ -241,6 +244,8 @@ Install build dependencies:
 python -m pip install ".[build]"
 ```
 
+The build environment must be able to import `jinja2` and `pyodbc`; the build script checks this before running PyInstaller. PyInstaller may still list Windows-irrelevant optional modules such as `grp`, `pwd`, `posix`, `fcntl`, `termios`, `java`, or `vms_lib` in its warning file. Those are normal stdlib/platform warnings and do not require action.
+
 Build the executable:
 
 ```powershell
@@ -250,7 +255,7 @@ Build the executable:
 The packaged app is written to:
 
 ```text
-dist\cfi-edi-processor\cfi-edi-processor.exe
+dist\Cayman First EDI Processor\Cayman First EDI Processor.exe
 ```
 
 The bundle includes:
@@ -262,13 +267,13 @@ The bundle includes:
 It does not include local `appsettings.json` or `.env`. Place those beside the `.exe` or pass explicit paths:
 
 ```powershell
-.\dist\cfi-edi-processor\cfi-edi-processor.exe --config C:\EDI\config\appsettings.json --env-file C:\EDI\config\.env --dry-run --provider Kirk_Pharmacy
+.\dist\Cayman First EDI Processor\Cayman First EDI Processor.exe --config C:\EDI\config\appsettings.json --env-file C:\EDI\config\.env --dry-run --provider Kirk_Pharmacy
 ```
 
 For the packaged Task Scheduler version, set Program to:
 
 ```text
-C:\Path\To\dist\cfi-edi-processor\cfi-edi-processor.exe
+C:\Path\To\dist\Cayman First EDI Processor\Cayman First EDI Processor.exe
 ```
 
 Arguments:
@@ -280,7 +285,7 @@ Arguments:
 Start in:
 
 ```text
-C:\Path\To\dist\cfi-edi-processor
+C:\Path\To\dist\Cayman First EDI Processor
 ```
 
 ## Pilot Checklist

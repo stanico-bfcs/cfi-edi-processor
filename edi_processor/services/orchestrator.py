@@ -22,6 +22,7 @@ from edi_processor.services.prefix_service import PrefixService
 from edi_processor.services.processing_summary_service import ProcessingSummaryService
 from edi_processor.services.provider_notification_service import ProviderNotificationService
 from edi_processor.services.received_date_override_service import ReceivedDateOverrideService
+from edi_processor.services.staging_service import StagingService
 from edi_processor.services.transaction_count_service import TransactionCountService
 from edi_processor.services.transaction_report_service import TransactionReportService
 from edi_processor.services.validation_report_service import ValidationReportService
@@ -42,13 +43,17 @@ class Orchestrator:
             settings=settings.received_date_overrides,
         )
         self.archive_service = ArchiveService()
+        self.staging_service = StagingService(settings.runtime.working_directory)
         self.prefix_service = PrefixService()
         self.duplicate_check_service = DuplicateCheckService(settings.duplicate_check)
         self.preprocessing_service = PreprocessingService(settings.runtime.working_directory)
         self.transaction_count_service = TransactionCountService(settings.validation_schemas)
         self.transaction_report_service = TransactionReportService(settings.runtime.logs_directory)
         self.validation_service = ValidationService(settings.validation_schemas)
-        self.x12_validation_service = X12ValidationService(settings.x12_validation)
+        self.x12_validation_service = X12ValidationService(
+            settings.x12_validation,
+            settings.runtime.working_directory,
+        )
         self.validation_report_service = ValidationReportService(
             settings.paths.validation_reports_directory
         )
@@ -183,6 +188,21 @@ class Orchestrator:
                 received_date=self._received_date_text(submission),
             )
 
+        original_submission = submission
+        staging_result = self.staging_service.stage(
+            submission=submission,
+            run_id=self.context.run_id,
+        )
+        if not staging_result.succeeded:
+            return FileProcessingResult(
+                provider_key=submission.provider.key,
+                file_name=submission.file_name,
+                status="staging_failed",
+                message=staging_result.message,
+                received_date=self._received_date_text(submission),
+            )
+
+        submission = staging_result.submission
         prefix_result = self.prefix_service.apply(
             submission=submission,
             run_id=self.context.run_id,
@@ -229,7 +249,6 @@ class Orchestrator:
                 received_date=self._received_date_text(submission),
             )
 
-        original_submission = submission
         preprocessing_result = self.preprocessing_service.preprocess(
             submission=submission,
             run_id=self.context.run_id,

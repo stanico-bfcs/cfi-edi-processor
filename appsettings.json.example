@@ -9,6 +9,7 @@
     ],
     "failOnFileStatuses": [
       "prefix_failed",
+      "staging_failed",
       "preprocessing_failed",
       "duplicate_skipped",
       "duplicate_check_failed",
