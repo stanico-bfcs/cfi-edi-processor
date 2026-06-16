@@ -89,9 +89,10 @@ class Orchestrator:
             extra={"run_id": self.context.run_id, "status": "validation_schemas_loaded"},
         )
         overrides = self.received_date_override_service.load(self.context.run_id)
+        provider_filter = self._effective_provider_filter()
         submissions = self.discovery_service.discover(
             self.context.run_id,
-            provider_filter=self.context.provider_filter,
+            provider_filter=provider_filter,
         )
         submissions = self.received_date_override_service.apply(
             submissions=submissions,
@@ -159,15 +160,25 @@ class Orchestrator:
         if not self.context.allow_live:
             raise RuntimeError("Live processing requires --allow-live.")
 
-        if not self.context.provider_filter:
-            raise RuntimeError("Live processing requires at least one --provider value.")
-
         allowed = set(self.settings.runtime.live_provider_allow_list)
+        if not allowed:
+            raise RuntimeError("Live processing requires runtime.liveProviderAllowList.")
+
         requested = set(self.context.provider_filter)
+        if not requested:
+            return
+
         blocked = requested - allowed
         if blocked:
             blocked_list = ", ".join(sorted(blocked))
             raise RuntimeError(f"Provider is not allowed for live processing: {blocked_list}")
+
+    def _effective_provider_filter(self) -> tuple[str, ...]:
+        if self.context.provider_filter:
+            return self.context.provider_filter
+        if self.context.dry_run:
+            return ()
+        return self.settings.runtime.live_provider_allow_list
 
     def _process_submission(self, submission: FileSubmission) -> FileProcessingResult:
         if submission.file_name.upper().startswith("NO"):

@@ -63,6 +63,10 @@ Configure source provider root, QDS processor folders, `C:\Files\INCOMING`, `C:\
 
 Provider root files are discovered and then copied to `work/staged/{MM-DD-YYYY}/{run_id}/{provider}/`. Prefix derivation, validation, preprocessing, transaction counting, and converter execution use the staged copy. The original provider-root file is only moved during final archive after successful processing.
 
+`publish`
+
+The publish step does not create temp files inside `INCOMING`. It copies the verified X12 to `publish.stagingDirectory`, or to a default hidden folder beside `INCOMING`, then moves the completed file into `INCOMING` with the final name. This is intended to trigger downstream pickup on the final file without exposing `.copying` files to the watched folder.
+
 `duplicateCheck`
 
 Optional TPM duplicate check against `batch.file_name`. The default `matchMode: "contains"` mirrors the legacy query:
@@ -139,19 +143,20 @@ python main.py --dry-run --config appsettings.json.example
 Only run live after paths, converters, duplicate check, and notification settings are confirmed.
 
 ```powershell
-python main.py --allow-live --provider Kirk_Pharmacy
+python main.py --allow-live
 ```
 
 Live runs require:
 
 - `--allow-live`
-- at least one `--provider`
-- provider listed in `runtime.liveProviderAllowList`
+- at least one provider listed in `runtime.liveProviderAllowList`
+
+Without `--provider`, live processing discovers providers from `runtime.liveProviderAllowList`. Passing `--provider` narrows the run further, and requested providers must still be in the allow-list.
 
 Email sending additionally requires:
 
 ```powershell
-python main.py --allow-live --allow-email --provider Kirk_Pharmacy
+python main.py --allow-live --allow-email
 ```
 
 ## Exit Codes
@@ -227,7 +232,7 @@ python
 Arguments:
 
 ```text
-main.py --allow-live --provider Kirk_Pharmacy
+main.py --allow-live
 ```
 
 Start in:
@@ -279,7 +284,7 @@ C:\Path\To\dist\Cayman First EDI Processor\Cayman First EDI Processor.exe
 Arguments:
 
 ```text
---config C:\EDI\config\appsettings.json --env-file C:\EDI\config\.env --allow-live --provider Kirk_Pharmacy
+--config C:\EDI\config\appsettings.json --env-file C:\EDI\config\.env --allow-live
 ```
 
 Start in:
@@ -297,7 +302,7 @@ C:\Path\To\dist\Cayman First EDI Processor
 5. Run `python main.py --dry-run --provider Kirk_Pharmacy`.
 6. Review `logs/runs/{date}/{run_id}_summary.json`.
 7. Confirm validation reports are expected or fix provider data/rules.
-8. Run live with `python main.py --allow-live --provider Kirk_Pharmacy`.
+8. Run live with `python main.py --allow-live`.
 9. Review run summary, converter logs, `INCOMING`, and archive folder.
 10. Confirm transaction count reports are generated under `logs/transaction_counts`.
 11. If using received date overrides, confirm `CFI-Admin\received_dates.csv` is deleted after a successful non-dry run.

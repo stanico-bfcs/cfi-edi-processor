@@ -52,7 +52,11 @@ class IncomingPublishService:
             )
 
         incoming_directory.mkdir(parents=True, exist_ok=True)
-        temp_destination = self._unique_destination(destination.with_name(f"{destination.name}{self.settings.temp_suffix}"))
+        staging_directory = self._staging_directory(incoming_directory)
+        staging_directory.mkdir(parents=True, exist_ok=True)
+        temp_destination = self._unique_destination(
+            staging_directory / f"{destination.name}{self.settings.temp_suffix}"
+        )
 
         for attempt in range(1, self.settings.max_retries + 1):
             try:
@@ -132,3 +136,8 @@ class IncomingPublishService:
             if not candidate.exists():
                 return candidate
             counter += 1
+
+    def _staging_directory(self, incoming_directory: Path) -> Path:
+        if self.settings.staging_directory is not None:
+            return self.settings.staging_directory
+        return incoming_directory.parent / f".{incoming_directory.name}_staging"

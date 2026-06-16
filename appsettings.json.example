@@ -48,6 +48,7 @@
     "maxRetries": 5,
     "retryDelaySeconds": 5,
     "tempSuffix": ".copying",
+    "stagingDirectory": null,
     "observeInbox": false,
     "inboxObservationTimeoutSeconds": 60,
     "inboxObservationIntervalSeconds": 5

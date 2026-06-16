@@ -85,6 +85,7 @@ class PublishSettings:
     max_retries: int = 5
     retry_delay_seconds: float = 5.0
     temp_suffix: str = ".copying"
+    staging_directory: Path | None = None
     observe_inbox: bool = False
     inbox_observation_timeout_seconds: float = 60.0
     inbox_observation_interval_seconds: float = 5.0
@@ -345,6 +346,7 @@ def load_settings(config_path: Path) -> AppSettings:
         max_retries=int(publish_data.get("maxRetries", 5)),
         retry_delay_seconds=float(publish_data.get("retryDelaySeconds", 5.0)),
         temp_suffix=str(publish_data.get("tempSuffix", ".copying")),
+        staging_directory=_resolve_optional_path(base_dir, publish_data.get("stagingDirectory")),
         observe_inbox=bool(publish_data.get("observeInbox", False)),
         inbox_observation_timeout_seconds=float(
             publish_data.get("inboxObservationTimeoutSeconds", 60.0)
@@ -516,3 +518,9 @@ def _resolve_path(base_dir: Path, value: Any) -> Path:
     if path.is_absolute():
         return path
     return base_dir / path
+
+
+def _resolve_optional_path(base_dir: Path, value: Any) -> Path | None:
+    if value is None or str(value).strip() == "":
+        return None
+    return _resolve_path(base_dir, value)
